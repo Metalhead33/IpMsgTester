@@ -37,8 +37,9 @@ void Server::handleAcceptedClient(tcp::socket &&client, const boost::system::err
 void Server::onAcceptedPeer(Server::ClientIterator it)
 {
 	boost::asio::read(it->sock,boost::asio::buffer(it->buff.data(),it->buff.size()),
-					  [this,it](boost::system::error_code ec,size_t len) {
-						  onReadBuffer(it,ec,len,myfile);
+					  [this,it](const boost::system::error_code& ec,size_t len) {
+						  onReadBuffer(it,ec,len,this->myfile);
+						  return size_t(0);
 					  }
 					  );
 	/*boost::asio::async_read_until(it->sock,boost::asio::dynamic_buffer(it->buff),0x7F,
@@ -48,7 +49,7 @@ void Server::onAcceptedPeer(Server::ClientIterator it)
 	);*/
 }
 
-void Server::onReadBuffer(Server::ClientIterator it, boost::system::error_code ec, size_t len, std::ofstream &out)
+void Server::onReadBuffer(Server::ClientIterator it, const boost::system::error_code& ec, size_t len, std::ofstream &out)
 {
 	if(!ec) {
 		Client::Iterator first=it->buff.end(),last=it->buff.end(); bool checkedOnce=false;
@@ -94,7 +95,7 @@ void Server::onReadBuffer(Server::ClientIterator it, boost::system::error_code e
 			if(!it->sock.is_open()) {
 				clients.erase(it);
 			}
-	}
+		} onAcceptedPeer(it);
 }
 
 }

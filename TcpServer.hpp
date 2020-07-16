@@ -23,7 +23,7 @@ public:
 	void beginAccepting();
 	void handleAcceptedClient(tcp::socket&& client, const boost::system::error_code& error);
 	void onAcceptedPeer(ClientIterator it);
-	void onReadBuffer(ClientIterator it, boost::system::error_code ec, size_t len, std::ofstream& out);
+	void onReadBuffer(ClientIterator it, const boost::system::error_code& ec, size_t len, std::ofstream& out);
 };
 typedef Server::SharedPointer sServer;
 }
