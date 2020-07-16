@@ -3,22 +3,39 @@
 #include <cstring>
 #include <stdexcept>
 extern "C" {
+#include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 }
-
-SocketHandlerUnix::SocketHandlerUnix()
-	: sockfd(socket(AF_INET, SOCK_STREAM, 0)), conType(CONNECTION_TYPE::DISCONNECTED)
+SocketHandlerUnix::SocketHandlerUnix(const SocketHandlerUnix& cpy)
 {
-	if(sockfd != -1) throw std::runtime_error("Could not open socket!\n");
+	socklen_t sizeToPass = sizeof(socketAddress);
+	sockfd = accept(cpy.sockfd,reinterpret_cast<struct sockaddr*>(&socketAddress),&sizeToPass);
+	if(sockfd < 0) throw std::runtime_error("Could not accept connection!\n");
+	conType = CONNECTION_TYPE::CONNECTED;
+}
+
+void SocketHandlerUnix::operator=(const SocketHandlerUnix &cpy)
+{
+	if(sockfd != -1) close(sockfd);
+	socklen_t sizeToPass = sizeof(socketAddress);
+	sockfd = accept(cpy.sockfd,reinterpret_cast<struct sockaddr*>(&socketAddress),&sizeToPass);
+	if(sockfd < 0) throw std::runtime_error("Could not accept connection!\n");
+	conType = CONNECTION_TYPE::CONNECTED;
+}
+SocketHandlerUnix::SocketHandlerUnix()
+	: sockfd(socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)), conType(CONNECTION_TYPE::DISCONNECTED)
+{
+	if(sockfd < 0) throw std::runtime_error("Could not open socket!\n");
 }
 SocketHandlerUnix::SocketHandlerUnix(const char *addr, int port, CONNECTION_TYPE nConType)
 {
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(sockfd == -1) throw std::runtime_error("Could not open socket!\n");
+	sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if(sockfd < 0) throw std::runtime_error("Could not open socket!\n");
 	socketAddress.sin_port = htons(port);
 	inet_aton(addr,&(socketAddress.sin_addr));
 	std::memset(socketAddress.sin_zero,0,8);
@@ -33,7 +50,7 @@ SocketHandlerUnix::SocketHandlerUnix(const char *addr, int port, CONNECTION_TYPE
 	case CONNECTION_TYPE::BOUND:
 	{
 		if(!bindTo())
-			throw std::runtime_error("Could not connect to socket!\n");
+			throw std::runtime_error("Could not bind to socket!\n");
 		conType = CONNECTION_TYPE::BOUND;
 		break;
 	}
@@ -95,7 +112,7 @@ bool SocketHandlerUnix::connectTo(const char *addr, int port)
 	socketAddress.sin_port = htons(port);
 	inet_aton(addr,&(socketAddress.sin_addr));
 	std::memset(socketAddress.sin_zero,0,8);
-	if(connect(sockfd,reinterpret_cast<struct sockaddr *>(&socketAddress),sizeof(socketAddress)) == -1)
+	if(connect(sockfd,reinterpret_cast<struct sockaddr *>(&socketAddress),sizeof(socketAddress)) < 0)
 	{
 		return false;
 	}
@@ -107,7 +124,7 @@ bool SocketHandlerUnix::connectTo(const char *addr, int port)
 
 bool SocketHandlerUnix::bindTo()
 {
-	if(bind(sockfd,reinterpret_cast<struct sockaddr *>(&socketAddress),sizeof(socketAddress)) == -1)
+	if(bind(sockfd,reinterpret_cast<struct sockaddr *>(&socketAddress),sizeof(socketAddress)) < 0)
 	{
 		conType = CONNECTION_TYPE::DISCONNECTED;
 		return false;
@@ -123,7 +140,7 @@ bool SocketHandlerUnix::bindTo(const char *addr, int port)
 	socketAddress.sin_port = htons(port);
 	inet_aton(addr,&(socketAddress.sin_addr));
 	std::memset(socketAddress.sin_zero,0,8);
-	if(bind(sockfd,reinterpret_cast<struct sockaddr *>(&socketAddress),sizeof(socketAddress)) == -1)
+	if(bind(sockfd,reinterpret_cast<struct sockaddr *>(&socketAddress),sizeof(socketAddress)) < 0)
 	{
 		return false;
 	}
@@ -143,22 +160,21 @@ long SocketHandlerUnix::receiveMessage(void *buf, size_t len, int flags) const
 	return recv(sockfd,buf,len,flags);
 }
 
-int SocketHandlerUnix::listenTo(int sockfd, int backlog) const
+int SocketHandlerUnix::listenTo(int backlog) const
 {
 	return listen(sockfd,backlog);
 }
 
-int SocketHandlerUnix::acceptConnection()
+SocketHandlerUnix SocketHandlerUnix::acceptConnection() const
 {
-	socklen_t sizeToPass = sizeof(socketAddress);
-	return accept(sockfd,reinterpret_cast<struct sockaddr*>(&socketAddress),&sizeToPass);
+	return SocketHandlerUnix(*this);
 }
 
 bool SocketHandlerUnix::getDebug() const
 {
 	ReceptClass retval;
 	socklen_t len=sizeof(int);
-	if(getsockopt(sockfd,SOL_SOCKET,SO_DEBUG,&retval,&len) == -1) return false;
+	if(getsockopt(sockfd,IPPROTO_TCP,SO_DEBUG,&retval,&len) == -1) return false;
 	else return bool(retval.integer);
 }
 void SocketHandlerUnix::setDebug(bool nval)

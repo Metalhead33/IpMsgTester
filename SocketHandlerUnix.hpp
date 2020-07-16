@@ -23,14 +23,14 @@ private:
 	sockaddr_in socketAddress;
 	int sockfd;
 	CONNECTION_TYPE conType;
-	SocketHandlerUnix(const SocketHandlerUnix& cpy) = delete; // No copy-constructor
-	void operator=(const SocketHandlerUnix& cpy) = delete; // No copy assignment
 public:
 	~SocketHandlerUnix();
 	SocketHandlerUnix();
 	SocketHandlerUnix(const char* addr, int port, CONNECTION_TYPE nConType = CONNECTION_TYPE::DISCONNECTED);
 	SocketHandlerUnix(SocketHandlerUnix&& mov); // Move constructor
 	void operator=(SocketHandlerUnix&& mov); // Move assignment
+	SocketHandlerUnix(const SocketHandlerUnix& cpy); // Copy constructor via accept
+	void operator=(const SocketHandlerUnix& cpy); // Copy constructor via accept
 	std::string getIpAddr() const;
 
 	bool connectTo();
@@ -41,8 +41,8 @@ public:
 
 	long sendMessage(const void *msg, size_t len, int flags = 0) const;
 	long receiveMessage(void *buf, size_t len, int flags = 0) const;
-	int listenTo(int sockfd, int backlog) const;
-	int acceptConnection();
+	int listenTo(int backlog) const;
+	SocketHandlerUnix acceptConnection() const;
 
 	// Wrapper for setsocketopt and getsocketopt
 	bool getDebug() const;

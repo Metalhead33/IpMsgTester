@@ -84,11 +84,20 @@ int main(int argc, char *argv[])
 		}
 		// Okay, everything should be in order.
 		StdStream logfile(identifiers[CmdId::JOURNAL_PATH],false,true);
-		SocketHNDL socket(identifiers[CmdId::LISTENER_IP],portAddr,SocketHNDL::CONNECTION_TYPE::CONNECTED);
-		socket.setRcvTimeout( { 5, 0 } );
-		socket.setBlocking(true);
+		SocketHNDL server(identifiers[CmdId::LISTENER_IP],portAddr,SocketHNDL::CONNECTION_TYPE::DISCONNECTED);
+		server.setRcvTimeout( { 5, 0 } );
+		server.setBlocking(true);
+		server.setReuseAddr(true);
+		server.bindTo();
+		cout << "Server address: " << server.getIpAddr() << "\n";
+		if(server.listenTo(5) < 0)
+		{
+			cout << "Could not open socket for listening.\n";
+			return 0;
+		}
 		while(true)
 		{
+			auto socket = server.acceptConnection();
 			const long messageReceipt = socket.receiveMessage(buff.data(),buff.size());
 			if(messageReceipt > 0 ) {
 			std::vector<uint8_t>::iterator first=buff.end(),last=buff.end(); bool checkedOnce=false;
