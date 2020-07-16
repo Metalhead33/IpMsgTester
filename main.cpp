@@ -7,17 +7,11 @@
 #include <iomanip>
 #include <algorithm>
 #include "StdStream.hpp"
-#if defined(__unix__)
-#include "SocketHandlerUnix.hpp"
-typedef SocketHandlerUnix SocketHNDL;
-#elif defined(_WIN32)
-#include "SocketHandlerWin32.hpp"
-typedef SocketHandlerWin32 SocketHNDL;
-#else
-#error "Unsupported operating system!"
-#endif
+#include <boost/asio.hpp>
+#include <boost/asio/ip/address.hpp>
 
 using namespace std;
+using boost::asio::ip::tcp;
 
 enum CmdId :uint8_t {
 	LISTENER_IP=0,
@@ -35,6 +29,8 @@ int main(int argc, char *argv[])
 {
 	std::vector<uint8_t> buff(256);
 	stringstream outputter;
+	boost::asio::io_context io_context;
+	tcp::resolver resolver(io_context);
 	outputter.str("");
 	// Wrong number of arguments
 	if(argc < 7)
@@ -71,34 +67,27 @@ int main(int argc, char *argv[])
 		int portAddr;
 		if(!isIpAddress(identifiers[CmdId::LISTENER_IP]))
 		{
-			cout << "Listener's IP address is in incorrect format!\n"
+			cout << "Listener's IP address is in incorrect format: " << identifiers[CmdId::LISTENER_IP] << "\n"
 				"A proper format is [0-255].[0-255].[0-255].[0-255] - \n"
 				"In other words - four numbers between 0 and 255, spearated by a dot.\n";
 			return 0;
 		}
 		if(!isPort(identifiers[CmdId::LISTENER_PORT],&portAddr))
 		{
-			cout << "Listener's port is in incorrect format!\n"
+			cout << "Listener's port is in incorrect format:" << identifiers[CmdId::LISTENER_PORT] << "\n"
 				"A proper format would be a number - any number between 0 and 65535.\n";
 			return 0;
 		}
 		// Okay, everything should be in order.
 		StdStream logfile(identifiers[CmdId::JOURNAL_PATH],false,true);
-		SocketHNDL server(identifiers[CmdId::LISTENER_IP],portAddr,SocketHNDL::CONNECTION_TYPE::DISCONNECTED);
-		server.setRcvTimeout( { 5, 0 } );
-		server.setBlocking(true);
-		server.setReuseAddr(true);
-		server.bindTo();
-		cout << "Server address: " << server.getIpAddr() << "\n";
-		if(server.listenTo(5) < 0)
-		{
-			cout << "Could not open socket for listening.\n";
-			return 0;
-		}
+		tcp::resolver::results_type endpoints = resolver.resolve(identifiers[CmdId::LISTENER_IP], identifiers[CmdId::LISTENER_PORT]);
+		/*std::vector<boost::asio::ip::tcp::endpoint> endpoints;
+		endpoints.push_back(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(identifiers[CmdId::LISTENER_IP]),portAddr));*/
+		tcp::socket socket(io_context);
+		boost::asio::connect(socket, endpoints);
 		while(true)
 		{
-			auto socket = server.acceptConnection();
-			const long messageReceipt = socket.receiveMessage(buff.data(),buff.size());
+			const long messageReceipt = socket.read_some(boost::asio::buffer(buff.data(),buff.size()));
 			if(messageReceipt > 0 ) {
 			std::vector<uint8_t>::iterator first=buff.end(),last=buff.end(); bool checkedOnce=false;
 			for(auto it = std::begin(buff); it != std::end(buff); ++it)
@@ -132,7 +121,7 @@ int main(int argc, char *argv[])
 				const auto tmpstr = outputter.str();
 				outputter.str("");
 				logfile.write(tmpstr.data(),tmpstr.size()-1);
-				socket.sendMessage(&*first,std::distance(first,last));
+				socket.write_some(boost::asio::buffer(&*first,std::distance(first,last)));
 			}
 		}
 		}
@@ -161,11 +150,11 @@ bool isIpAddress(const char* string)
 }
 bool isPort(const char* string, int *portDest)
 {
+	const int converted = atoi(string);
 	for(;*string;++string)
 	{
 		if(!isdigit(*string)) return false;
 	}
-	const int converted = atoi(string);
 	if(converted <= 0xFFFF) {
 		*portDest = converted;
 		return true;
