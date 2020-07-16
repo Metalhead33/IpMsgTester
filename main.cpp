@@ -6,6 +6,7 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
+#include <fstream>
 #include "StdStream.hpp"
 #if defined(__unix__)
 #include "SocketHandlerUnix.hpp"
@@ -25,8 +26,6 @@ enum CmdId :uint8_t {
 	JOURNAL_PATH,
 	NONE
 };
-
-const std::string WrongFormat = "Invalid output detected!\n";
 
 CmdId getIdentifierType(const char* argument);
 bool isIpAddress(const char *string);
@@ -83,7 +82,8 @@ int main(int argc, char *argv[])
 			return 0;
 		}
 		// Okay, everything should be in order.
-		StdStream logfile(identifiers[CmdId::JOURNAL_PATH],false,true);
+		ofstream myfile;
+		myfile.open(identifiers[CmdId::JOURNAL_PATH]);
 		SocketHNDL server(identifiers[CmdId::LISTENER_IP],portAddr,SocketHNDL::CONNECTION_TYPE::DISCONNECTED);
 		server.setRcvTimeout( { 5, 0 } );
 		//server.setBlocking(true);
@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
 			}
 			if( (first == std::end(buff)) || (last == std::end(buff)) )
 			{
-				logfile.write(WrongFormat.data(),WrongFormat.size()-1);
+				myfile << "Invalid output detected!\n";
 			} else {
 				outputter << "Received bytes:\n";
 				for(auto it = first; it != last; ++it)
@@ -131,13 +131,14 @@ int main(int argc, char *argv[])
 				for(auto it = first; it != last; ++it)
 					outputter << hex << setfill('0') << setw(2) << int(*it) << " ";
 				outputter << "7e\n";
-				const auto tmpstr = outputter.str();
-				logfile.write(tmpstr.data(),tmpstr.size()-1);
+				myfile << outputter.str();
 				outputter.str("");
 				socket.sendMessage(&*first,std::distance(first,last));
+				break;
 			}
 		}
 		}
+		myfile.close();
 	}
 	return 0;
 }

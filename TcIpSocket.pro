@@ -6,14 +6,11 @@ CONFIG -= qt
 SOURCES += \
         SocketHandlerUnix.cpp \
         SocketHandlerWin32.cpp \
-        StdStream.cpp \
         main.cpp
 
 HEADERS += \
-	FIO.hpp \
 	SocketHandlerUnix.hpp \
-	SocketHandlerWin32.hpp \
-	StdStream.hpp
+	SocketHandlerWin32.hpp
 
 DISTFILES += \
 	README.md
