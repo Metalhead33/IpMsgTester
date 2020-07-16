@@ -14,3 +14,6 @@ HEADERS += \
 	SocketHandlerUnix.hpp \
 	SocketHandlerWin32.hpp \
 	StdStream.hpp
+
+DISTFILES += \
+	README.md

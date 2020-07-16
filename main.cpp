@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 			}
 			if( (first == std::end(buff)) || (last == std::end(buff)) )
 			{
-				logfile.write(WrongFormat.data(),WrongFormat.size());
+				logfile.write(WrongFormat.data(),WrongFormat.size()-1);
 				break;
 			} else {
 				outputter << "Received bytes:\n";
@@ -119,6 +119,9 @@ int main(int argc, char *argv[])
 				for(auto it = first; it != last; ++it)
 					outputter << hex << setfill('0') << setw(2) << int(*it) << " ";
 				outputter << "7e\n";
+				const auto tmpstr = outputter.str();
+				outputter.str("");
+				logfile.write(tmpstr.data(),tmpstr.size()-1);
 				socket.sendMessage(&*first,std::distance(first,last));
 			}
 		}
