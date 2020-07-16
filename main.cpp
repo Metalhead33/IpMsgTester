@@ -2,22 +2,11 @@
 #include <string>
 #include <cstring>
 #include <cstdint>
-#include <vector>
-#include <sstream>
-#include <iomanip>
-#include <algorithm>
-#include <fstream>
-#if defined(__unix__)
-#include "SocketHandlerUnix.hpp"
-typedef SocketHandlerUnix SocketHNDL;
-#elif defined(_WIN32)
-#include "SocketHandlerWin32.hpp"
-typedef SocketHandlerWin32 SocketHNDL;
-#else
-#error "Unsupported operating system!"
-#endif
+#include "TcpServer.hpp"
+
 
 using namespace std;
+using boost::asio::ip::tcp;
 
 enum CmdId :uint8_t {
 	LISTENER_IP=0,
@@ -26,14 +15,15 @@ enum CmdId :uint8_t {
 	NONE
 };
 
+const std::string WrongFormat = "Invalid output detected!\n";
+
 CmdId getIdentifierType(const char* argument);
 bool isIpAddress(const char *string);
 bool isPort(const char* string, int* portDest);
 int main(int argc, char *argv[])
 {
 	std::vector<uint8_t> buff(256);
-	stringstream outputter;
-	outputter.str("");
+	boost::asio::io_context io_context;
 	// Wrong number of arguments
 	if(argc < 7)
 	{
@@ -69,76 +59,21 @@ int main(int argc, char *argv[])
 		int portAddr;
 		if(!isIpAddress(identifiers[CmdId::LISTENER_IP]))
 		{
-			cout << "Listener's IP address is in incorrect format!\n"
+			cout << "Listener's IP address is in incorrect format: " << identifiers[CmdId::LISTENER_IP] << "\n"
 				"A proper format is [0-255].[0-255].[0-255].[0-255] - \n"
 				"In other words - four numbers between 0 and 255, spearated by a dot.\n";
 			return 0;
 		}
 		if(!isPort(identifiers[CmdId::LISTENER_PORT],&portAddr))
 		{
-			cout << "Listener's port is in incorrect format!\n"
+			cout << "Listener's port is in incorrect format:" << identifiers[CmdId::LISTENER_PORT] << "\n"
 				"A proper format would be a number - any number between 0 and 65535.\n";
 			return 0;
 		}
 		// Okay, everything should be in order.
-		ofstream myfile;
-		myfile.open(identifiers[CmdId::JOURNAL_PATH]);
-		SocketHNDL server(identifiers[CmdId::LISTENER_IP],portAddr,SocketHNDL::CONNECTION_TYPE::DISCONNECTED);
-		server.setRcvTimeout( { 5, 0 } );
-		//server.setBlocking(true);
-		server.setReuseAddr(true);
-		server.bindTo();
-		cout << "Server address: " << server.getIpAddr() << "\n";
-		if(server.listenTo(5) < 0)
-		{
-			cout << "Could not open socket for listening.\n";
-			return 0;
-		}
-		while(true)
-		{
-			auto socket = server.acceptConnection();
-			cout << socket.getIpAddr() << endl;
-			const long messageReceipt = socket.receiveMessage(buff.data(),buff.size());
-			cout << messageReceipt << endl;
-			if(messageReceipt > 0 ) {
-			std::vector<uint8_t>::iterator first=buff.end(),last=buff.end(); bool checkedOnce=false;
-			for(auto it = std::begin(buff); it != std::end(buff); ++it)
-			{
-				if(*it == 0x7E)
-				{
-					if(checkedOnce)
-					{
-						last = it;
-						++last;
-						break;
-					}
-					else {
-						first = it;
-						checkedOnce = true;
-					}
-				}
-			}
-			if( (first == std::end(buff)) || (last == std::end(buff)) )
-			{
-				myfile << "Invalid output detected!\n";
-			} else {
-				outputter << "Received bytes:\n";
-				for(auto it = first; it != last; ++it)
-					outputter << hex << setfill('0') << setw(2) << int(*it) << " ";
-				outputter << "\n";
-				std::reverse(first,last);
-				outputter << "Sent bytes:\n";
-				for(auto it = first; it != last; ++it)
-					outputter << hex << setfill('0') << setw(2) << int(*it) << " ";
-				outputter << "\n";
-				myfile << outputter.str();
-				outputter.str("");
-				socket.sendMessage(&*first,std::distance(first,last));
-				break;
-			}
-		}
-		}
-		myfile.close();
+		TCP::Server serv(io_context,identifiers[CmdId::JOURNAL_PATH],tcp::endpoint(tcp::v4(), portAddr));
+		serv.run();
+		io_context.run();
 	}
 	return 0;
 }
@@ -164,11 +99,11 @@ bool isIpAddress(const char* string)
 }
 bool isPort(const char* string, int *portDest)
 {
-	for(const char* nstring=string ;*nstring;++nstring)
-	{
-		if(!isdigit(*nstring)) return false;
-	}
 	const int converted = atoi(string);
+	for(;*string;++string)
+	{
+		if(!isdigit(*string)) return false;
+	}
 	if(converted <= 0xFFFF) {
 		*portDest = converted;
 		return true;
