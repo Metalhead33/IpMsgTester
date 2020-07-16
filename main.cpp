@@ -161,9 +161,9 @@ bool isIpAddress(const char* string)
 }
 bool isPort(const char* string, int *portDest)
 {
-	for(;*string;++string)
+	for(const char* nstring=string ;*nstring;++nstring)
 	{
-		if(!isdigit(*string)) return false;
+		if(!isdigit(*nstring)) return false;
 	}
 	const int converted = atoi(string);
 	if(converted <= 0xFFFF) {
