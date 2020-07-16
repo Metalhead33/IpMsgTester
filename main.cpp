@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 		StdStream logfile(identifiers[CmdId::JOURNAL_PATH],false,true);
 		SocketHNDL server(identifiers[CmdId::LISTENER_IP],portAddr,SocketHNDL::CONNECTION_TYPE::DISCONNECTED);
 		server.setRcvTimeout( { 5, 0 } );
-		server.setBlocking(true);
+		//server.setBlocking(true);
 		server.setReuseAddr(true);
 		server.bindTo();
 		cout << "Server address: " << server.getIpAddr() << "\n";
@@ -98,7 +98,9 @@ int main(int argc, char *argv[])
 		while(true)
 		{
 			auto socket = server.acceptConnection();
+			cout << socket.getIpAddr() << endl;
 			const long messageReceipt = socket.receiveMessage(buff.data(),buff.size());
+			cout << messageReceipt << endl;
 			if(messageReceipt > 0 ) {
 			std::vector<uint8_t>::iterator first=buff.end(),last=buff.end(); bool checkedOnce=false;
 			for(auto it = std::begin(buff); it != std::end(buff); ++it)
@@ -130,8 +132,8 @@ int main(int argc, char *argv[])
 					outputter << hex << setfill('0') << setw(2) << int(*it) << " ";
 				outputter << "7e\n";
 				const auto tmpstr = outputter.str();
-				outputter.str("");
 				logfile.write(tmpstr.data(),tmpstr.size()-1);
+				outputter.str("");
 				socket.sendMessage(&*first,std::distance(first,last));
 			}
 		}

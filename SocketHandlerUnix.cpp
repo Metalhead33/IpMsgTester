@@ -36,8 +36,10 @@ SocketHandlerUnix::SocketHandlerUnix(const char *addr, int port, CONNECTION_TYPE
 {
 	sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if(sockfd < 0) throw std::runtime_error("Could not open socket!\n");
+	socketAddress.sin_family = AF_INET;
 	socketAddress.sin_port = htons(port);
-	inet_aton(addr,&(socketAddress.sin_addr));
+	socketAddress.sin_addr.s_addr = INADDR_ANY;
+	//inet_aton(addr,&(socketAddress.sin_addr));
 	std::memset(socketAddress.sin_zero,0,8);
 	switch (nConType) {
 	case CONNECTION_TYPE::CONNECTED:
