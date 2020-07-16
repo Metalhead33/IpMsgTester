@@ -125,10 +125,12 @@ int main(int argc, char *argv[])
 				outputter << "Received bytes:\n";
 				for(auto it = first; it != last; ++it)
 					outputter << hex << setfill('0') << setw(2) << int(*it) << " ";
+				outputter << "\n";
 				std::reverse(first,last);
 				outputter << "Sent bytes:\n";
 				for(auto it = first; it != last; ++it)
 					outputter << hex << setfill('0') << setw(2) << int(*it) << " ";
+				outputter << "\n";
 				myfile << outputter.str();
 				outputter.str("");
 				socket.sendMessage(&*first,std::distance(first,last));
