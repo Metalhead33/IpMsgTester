@@ -18,7 +18,7 @@ SocketHandlerUnix::SocketHandlerUnix()
 SocketHandlerUnix::SocketHandlerUnix(const char *addr, int port, CONNECTION_TYPE nConType)
 {
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(sockfd != -1) throw std::runtime_error("Could not open socket!\n");
+	if(sockfd == -1) throw std::runtime_error("Could not open socket!\n");
 	socketAddress.sin_port = htons(port);
 	inet_aton(addr,&(socketAddress.sin_addr));
 	std::memset(socketAddress.sin_zero,0,8);
@@ -138,7 +138,7 @@ long SocketHandlerUnix::sendMessage(const void *msg, size_t len, int flags) cons
 	return send(sockfd,msg,len,flags);
 }
 
-long SocketHandlerUnix::receiveMessage(void *buf, size_t len, unsigned int flags) const
+long SocketHandlerUnix::receiveMessage(void *buf, size_t len, int flags) const
 {
 	return recv(sockfd,buf,len,flags);
 }

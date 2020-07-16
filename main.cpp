@@ -86,9 +86,11 @@ int main(int argc, char *argv[])
 		StdStream logfile(identifiers[CmdId::JOURNAL_PATH],false,true);
 		SocketHNDL socket(identifiers[CmdId::LISTENER_IP],portAddr,SocketHNDL::CONNECTION_TYPE::CONNECTED);
 		socket.setRcvTimeout( { 5, 0 } );
-		long messageReceipt = 0;
-		while( (messageReceipt = socket.receiveMessage(buff.data(),buff.size())) != -1)
+		socket.setBlocking(true);
+		while(true)
 		{
+			const long messageReceipt = socket.receiveMessage(buff.data(),buff.size());
+			if(messageReceipt > 0 ) {
 			std::vector<uint8_t>::iterator first=buff.end(),last=buff.end(); bool checkedOnce=false;
 			for(auto it = std::begin(buff); it != std::end(buff); ++it)
 			{
@@ -108,7 +110,6 @@ int main(int argc, char *argv[])
 			if( (first == std::end(buff)) || (last == std::end(buff)) )
 			{
 				logfile.write(WrongFormat.data(),WrongFormat.size()-1);
-				break;
 			} else {
 				outputter << "Received bytes:\n";
 				for(auto it = first; it != last; ++it)
@@ -125,7 +126,7 @@ int main(int argc, char *argv[])
 				socket.sendMessage(&*first,std::distance(first,last));
 			}
 		}
-
+		}
 	}
 	return 0;
 }
@@ -142,19 +143,18 @@ CmdId getIdentifierType(const char* argument)
 bool isIpAddress(const char* string)
 {
 	bool wasDot=true;
-	for(;string;++string)
+	for(;*string;++string)
 	{
-		if(wasDot && *string=='.') return false;
-		else if(!isxdigit(*string)) return false;
+		if(wasDot && !isdigit(*string)) return false;
 		else wasDot = (*string == '.');
 	}
 	return true;
 }
 bool isPort(const char* string, int *portDest)
 {
-	for(;string;++string)
+	for(;*string;++string)
 	{
-		if(!isxdigit(*string)) return false;
+		if(!isdigit(*string)) return false;
 	}
 	const int converted = atoi(string);
 	if(converted <= 0xFFFF) {

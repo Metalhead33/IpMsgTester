@@ -40,7 +40,7 @@ public:
 	CONNECTION_TYPE getConType() const;
 
 	long sendMessage(const void *msg, size_t len, int flags = 0) const;
-	long receiveMessage(void *buf, size_t len, unsigned int flags = 0) const;
+	long receiveMessage(void *buf, size_t len, int flags = 0) const;
 	int listenTo(int sockfd, int backlog) const;
 	int acceptConnection();
 
