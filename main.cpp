@@ -6,6 +6,7 @@
 
 
 using namespace std;
+using boost::asio::ip::tcp;
 
 enum CmdId :uint8_t {
 	LISTENER_IP=0,
@@ -70,9 +71,7 @@ int main(int argc, char *argv[])
 			return 0;
 		}
 		// Okay, everything should be in order.
-		ofstream myfile;
-		myfile.open(identifiers[CmdId::JOURNAL_PATH]);
-		TCP::Server serv(io_context,identifiers[CmdId::JOURNAL_PATH],portAddr);
+		TCP::Server serv(io_context,identifiers[CmdId::JOURNAL_PATH],tcp::endpoint(tcp::v4(), portAddr));
 		serv.beginAccepting();
 	}
 	return 0;

@@ -4,24 +4,32 @@
 
 namespace TCP {
 
-Server::Server(boost::asio::io_context &iocontenxt, std::ofstream &&nfile, uint16_t port)
-	: context(iocontenxt), myfile(std::move(nfile)), acceptor(context, tcp::endpoint(tcp::v4(), port))
+Server::Server(boost::asio::io_context &iocontenxt, std::ofstream &&nfile, const boost::asio::ip::tcp::endpoint &ep)
+	: context(iocontenxt), myfile(std::move(nfile)), acceptor(context)
 {
-
+	acceptor.open(ep.protocol());
+	acceptor.set_option(boost::asio::ip::tcp::socket::reuse_address(true));
+	acceptor.bind(ep);
 }
-Server::Server(boost::asio::io_context& iocontenxt,const char* nfile, uint16_t port)
-	: context(iocontenxt), acceptor(context, tcp::endpoint(tcp::v4(), port))
+Server::Server(boost::asio::io_context& iocontenxt, const char* nfile, const tcp::endpoint &ep)
+	: context(iocontenxt), acceptor(context)
 {
 	myfile.open(nfile);
+	acceptor.open(ep.protocol());
+	acceptor.set_option(boost::asio::ip::tcp::socket::reuse_address(true));
+	acceptor.bind(ep);
 }
 
 void Server::beginAccepting()
 {
+	acceptor.listen(5);
+	while(true) {
 	acceptor.async_accept(
 		[this](boost::system::error_code errcode,boost::asio::ip::tcp::socket gsock) {
 			handleAcceptedClient(std::move(gsock),errcode);
 		}
 	);
+	}
 }
 
 void Server::handleAcceptedClient(tcp::socket &&client, const boost::system::error_code &error)
@@ -39,7 +47,7 @@ void Server::onAcceptedPeer(Server::ClientIterator it)
 	boost::asio::read(it->sock,boost::asio::buffer(it->buff.data(),it->buff.size()),
 					  [this,it](const boost::system::error_code& ec,size_t len) {
 						  onReadBuffer(it,ec,len,this->myfile);
-						  return size_t(0);
+						  return size_t(it->buff.size() - len);
 					  }
 					  );
 	/*boost::asio::async_read_until(it->sock,boost::asio::dynamic_buffer(it->buff),0x7F,
@@ -51,6 +59,7 @@ void Server::onAcceptedPeer(Server::ClientIterator it)
 
 void Server::onReadBuffer(Server::ClientIterator it, const boost::system::error_code& ec, size_t len, std::ofstream &out)
 {
+	std::cout << "I got it!" << len << std::endl;
 	if(!ec) {
 		Client::Iterator first=it->buff.end(),last=it->buff.end(); bool checkedOnce=false;
 		for(auto zt = std::begin(it->buff); zt != std::end(it->buff); ++zt)

@@ -18,8 +18,8 @@ private:
 	tcp::acceptor acceptor;
 	ClientList clients;
 public:
-	Server(boost::asio::io_context& iocontenxt,std::ofstream&& nfile, uint16_t port);
-	Server(boost::asio::io_context& iocontenxt,const char* nfile, uint16_t port);
+	Server(boost::asio::io_context& iocontenxt, std::ofstream&& nfile, const tcp::endpoint &ep);
+	Server(boost::asio::io_context& iocontenxt,const char* nfile, const boost::asio::ip::tcp::endpoint &ep);
 	void beginAccepting();
 	void handleAcceptedClient(tcp::socket&& client, const boost::system::error_code& error);
 	void onAcceptedPeer(ClientIterator it);
