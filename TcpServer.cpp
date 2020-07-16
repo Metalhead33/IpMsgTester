@@ -22,14 +22,11 @@ Server::Server(boost::asio::io_context& iocontenxt, const char* nfile, const tcp
 
 void Server::beginAccepting()
 {
-	acceptor.listen(5);
-	while(true) {
 	acceptor.async_accept(
 		[this](boost::system::error_code errcode,boost::asio::ip::tcp::socket gsock) {
 			handleAcceptedClient(std::move(gsock),errcode);
 		}
 	);
-	}
 }
 
 void Server::handleAcceptedClient(tcp::socket &&client, const boost::system::error_code &error)
@@ -70,14 +67,21 @@ void Server::onReadBuffer(Server::ClientIterator it, const boost::system::error_
 		std::advance(end, len-1);
 
 		if(it->between) {
-			std::string res(start, end);
-			std::ostream_iterator<uint8_t> out(myfile);
+			std::basic_string<uint8_t> res(start, end);
+			res = uint8_t(0x7E) + res + uint8_t(0x7E);
+			myfile << std::hex;
 			myfile << "Input: ";
-			std::copy(res.begin(), res.end(), out);
+			for(const auto& character : res)
+			{
+				myfile << std::hex << std::setfill('0') << std::setw(2) << int(character) << " ";
+			}
 			myfile << std::endl;
 			myfile << "Output: ";
 			std::reverse(res.begin(), res.end());
-			std::copy(res.begin(), res.end(), out);
+			for(const auto& character : res)
+			{
+				myfile << std::hex << std::setfill('0') << std::setw(2) << int(character) << " ";
+			}
 			myfile << std::endl;
 
 			boost::asio::write(it->sock, boost::asio::buffer( res ));
@@ -106,6 +110,12 @@ void Server::onReadBuffer(Server::ClientIterator it, const boost::system::error_
 	}
 
 	beginReading(it);
+}
+
+void Server::run()
+{
+	acceptor.listen(5);
+	beginAccepting();
 }
 
 }

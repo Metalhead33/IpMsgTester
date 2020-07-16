@@ -72,7 +72,8 @@ int main(int argc, char *argv[])
 		}
 		// Okay, everything should be in order.
 		TCP::Server serv(io_context,identifiers[CmdId::JOURNAL_PATH],tcp::endpoint(tcp::v4(), portAddr));
-		serv.beginAccepting();
+		serv.run();
+		io_context.run();
 	}
 	return 0;
 }

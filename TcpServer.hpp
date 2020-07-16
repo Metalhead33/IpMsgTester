@@ -24,6 +24,7 @@ public:
 	void handleAcceptedClient(tcp::socket&& client, const boost::system::error_code& error);
 	void beginReading(ClientIterator it);
 	void onReadBuffer(ClientIterator it, const boost::system::error_code& ec, size_t len);
+	void run();
 };
 typedef Server::SharedPointer sServer;
 }
