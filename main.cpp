@@ -2,16 +2,10 @@
 #include <string>
 #include <cstring>
 #include <cstdint>
-#include <vector>
-#include <sstream>
-#include <iomanip>
-#include <algorithm>
-#include "StdStream.hpp"
-#include <boost/asio.hpp>
-#include <boost/asio/ip/address.hpp>
+#include "TcpServer.hpp"
+
 
 using namespace std;
-using boost::asio::ip::tcp;
 
 enum CmdId :uint8_t {
 	LISTENER_IP=0,
@@ -28,10 +22,7 @@ bool isPort(const char* string, int* portDest);
 int main(int argc, char *argv[])
 {
 	std::vector<uint8_t> buff(256);
-	stringstream outputter;
 	boost::asio::io_context io_context;
-	tcp::resolver resolver(io_context);
-	outputter.str("");
 	// Wrong number of arguments
 	if(argc < 7)
 	{
@@ -79,52 +70,10 @@ int main(int argc, char *argv[])
 			return 0;
 		}
 		// Okay, everything should be in order.
-		StdStream logfile(identifiers[CmdId::JOURNAL_PATH],false,true);
-		tcp::resolver::results_type endpoints = resolver.resolve(identifiers[CmdId::LISTENER_IP], identifiers[CmdId::LISTENER_PORT]);
-		/*std::vector<boost::asio::ip::tcp::endpoint> endpoints;
-		endpoints.push_back(boost::asio::ip::tcp::endpoint(boost::asio::ip::address::from_string(identifiers[CmdId::LISTENER_IP]),portAddr));*/
-		tcp::socket socket(io_context);
-		boost::asio::connect(socket, endpoints);
-		while(true)
-		{
-			const long messageReceipt = socket.read_some(boost::asio::buffer(buff.data(),buff.size()));
-			if(messageReceipt > 0 ) {
-			std::vector<uint8_t>::iterator first=buff.end(),last=buff.end(); bool checkedOnce=false;
-			for(auto it = std::begin(buff); it != std::end(buff); ++it)
-			{
-				if(*it == 0x7E)
-				{
-					if(checkedOnce)
-					{
-						last = it;
-						break;
-					}
-					else {
-						first = it;
-						checkedOnce = true;
-					}
-				}
-			}
-			if( (first == std::end(buff)) || (last == std::end(buff)) )
-			{
-				logfile.write(WrongFormat.data(),WrongFormat.size()-1);
-			} else {
-				outputter << "Received bytes:\n";
-				for(auto it = first; it != last; ++it)
-					outputter << hex << setfill('0') << setw(2) << int(*it) << " ";
-				outputter << "7e\n";
-				std::reverse(first,last);
-				outputter << "Sent bytes:\n";
-				for(auto it = first; it != last; ++it)
-					outputter << hex << setfill('0') << setw(2) << int(*it) << " ";
-				outputter << "7e\n";
-				const auto tmpstr = outputter.str();
-				outputter.str("");
-				logfile.write(tmpstr.data(),tmpstr.size()-1);
-				socket.write_some(boost::asio::buffer(&*first,std::distance(first,last)));
-			}
-		}
-		}
+		ofstream myfile;
+		myfile.open(identifiers[CmdId::JOURNAL_PATH]);
+		TCP::Server serv(io_context,identifiers[CmdId::JOURNAL_PATH],portAddr);
+		serv.beginAccepting();
 	}
 	return 0;
 }

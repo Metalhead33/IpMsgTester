@@ -5,12 +5,13 @@ CONFIG -= qt
 LIBS += -lboost_system -pthread
 
 SOURCES += \
-        StdStream.cpp \
+        TcpClient.cpp \
+        TcpServer.cpp \
         main.cpp
 
 HEADERS += \
-	FIO.hpp \
-	StdStream.hpp
+	TcpClient.hpp \
+	TcpServer.hpp
 
 DISTFILES += \
 	README.md
