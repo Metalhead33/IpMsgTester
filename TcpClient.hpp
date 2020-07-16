@@ -18,13 +18,15 @@ class Client : boost::enable_shared_from_this<Client>
 public:
 	friend class Server;
 	typedef boost::shared_ptr<Client> SharedPointer;
-	typedef std::array<uint8_t,256> Arr;
+	//typedef std::array<uint8_t,256> Arr;
+	typedef std::vector<uint8_t> Arr;
 	typedef Arr::iterator Iterator;
 private:
 	tcp::socket sock;
 	//std::vector<uint8_t> buff;
 	Arr buff;
 	std::stringstream outputter;
+	bool between;
 public:
 	Client(boost::asio::io_context& context);
 	Client(tcp::socket&& context);

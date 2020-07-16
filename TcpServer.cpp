@@ -37,62 +37,60 @@ void Server::handleAcceptedClient(tcp::socket &&client, const boost::system::err
 	if(!error) {
 		clients.emplace_front(std::forward<tcp::socket>(client));
 		auto reference = clients.begin();
-		onAcceptedPeer(reference);
+		beginReading(reference);
 	}
 	beginAccepting();
 }
 
-void Server::onAcceptedPeer(Server::ClientIterator it)
+void Server::beginReading(Server::ClientIterator it)
 {
-	boost::asio::read(it->sock,boost::asio::buffer(it->buff.data(),it->buff.size()),
+	/*boost::asio::async_read(it->sock,boost::asio::buffer(it->buff.data(),it->buff.size()),
 					  [this,it](const boost::system::error_code& ec,size_t len) {
 						  onReadBuffer(it,ec,len,this->myfile);
 						  return size_t(it->buff.size() - len);
 					  }
-					  );
+					  );*/
 	/*boost::asio::async_read_until(it->sock,boost::asio::dynamic_buffer(it->buff),0x7F,
 							[this,it](boost::system::error_code ec,size_t len) {
 								onReadBuffer(it,ec,len);
 							}
 	);*/
+	boost::asio::async_read_until(
+		it->sock, boost::asio::dynamic_buffer(it->buff), 0x7E,[this,it](boost::system::error_code ec, size_t len){
+			onReadBuffer(it, ec, len);
+		}
+		);
 }
 
-void Server::onReadBuffer(Server::ClientIterator it, const boost::system::error_code& ec, size_t len, std::ofstream &out)
-{
-	std::cout << "I got it!" << len << std::endl;
+void Server::onReadBuffer(Server::ClientIterator it, const boost::system::error_code& ec, size_t len){
 	if(!ec) {
-		Client::Iterator first=it->buff.end(),last=it->buff.end(); bool checkedOnce=false;
-		for(auto zt = std::begin(it->buff); zt != std::end(it->buff); ++zt)
-			{
-				if(*zt == 0x7E)
-				{
-					if(checkedOnce)
-					{
-						last = zt;
-						++last;
-						break;
-					}
-					else {
-						first = zt;
-						checkedOnce = true;
-					}
-				}
-			}
-			if( (first == std::end(it->buff)) || (last == std::end(it->buff)) )
-			{
-				myfile << "Invalid output detected!\n";
-			} else {
-				it->outputter << "Received bytes:\n";
-				for(auto dt = first; dt != last; ++dt)
-					it->outputter << std::hex << std::setfill('0') << std::setw(2) << int(*dt) << " ";
-				std::reverse(first,last);
-				it->outputter << "Sent bytes:\n";
-				for(auto dt = first; dt != last; ++dt)
-					it->outputter << std::hex << std::setfill('0') << std::setw(2) << int(*dt) << " ";
-				myfile << it->outputter.str();
-				it->outputter.str("");
-				boost::asio::write(it->sock,boost::asio::buffer(&*first,std::distance(first,last)));
-			} } else switch(ec.value()) {
+		std::cout << "Received data of length " << len << std::endl;
+		auto start = it->buff.begin();
+		auto end = start;
+		std::advance(end, len-1);
+
+		if(it->between) {
+			std::string res(start, end);
+			std::ostream_iterator<uint8_t> out(myfile);
+			myfile << "Input: ";
+			std::copy(res.begin(), res.end(), out);
+			myfile << std::endl;
+			myfile << "Output: ";
+			std::reverse(res.begin(), res.end());
+			std::copy(res.begin(), res.end(), out);
+			myfile << std::endl;
+
+			boost::asio::write(it->sock, boost::asio::buffer( res ));
+			it->between = false;
+		} else {
+			std::string res(start, end);
+			boost::asio::write(it->sock, boost::asio::buffer( res ));
+			it->between = true;
+		}
+		it->buff.erase(start, end);
+		it->buff.erase(std::begin(it->buff),std::begin(it->buff)+1);
+	} else {
+		switch(ec.value()) {
 		case boost::asio::error::eof:
 			it->sock.close();
 			clients.erase(it);
@@ -104,7 +102,10 @@ void Server::onReadBuffer(Server::ClientIterator it, const boost::system::error_
 			if(!it->sock.is_open()) {
 				clients.erase(it);
 			}
-		} onAcceptedPeer(it);
+		}
+	}
+
+	beginReading(it);
 }
 
 }
