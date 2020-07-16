@@ -4,13 +4,13 @@ Just an assignment I have to do for my job application. The goal of the program 
 The IP address, port, and address of the log file are intended to be given in command line parameters, doing 
 
 ```console
-TcIpSocket -ip <IP address> -p <Port address> -j <Address of the log file>
+IpMsgTester -ip <IP address> -p <Port address> -j <Address of the log file>
 ```
 
 On Unix-based systems, and 
 
 ```console
-TcIpSocket.exe -ip <IP address> -p <Port address> -j <Address of the log file>
+IpMsgTester.exe -ip <IP address> -p <Port address> -j <Address of the log file>
 ```
 
 On Windows-based systems.
