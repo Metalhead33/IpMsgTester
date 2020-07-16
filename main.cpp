@@ -7,7 +7,6 @@
 #include <iomanip>
 #include <algorithm>
 #include <fstream>
-#include "StdStream.hpp"
 #if defined(__unix__)
 #include "SocketHandlerUnix.hpp"
 typedef SocketHandlerUnix SocketHNDL;
@@ -110,6 +109,7 @@ int main(int argc, char *argv[])
 					if(checkedOnce)
 					{
 						last = it;
+						++last;
 						break;
 					}
 					else {
@@ -125,12 +125,10 @@ int main(int argc, char *argv[])
 				outputter << "Received bytes:\n";
 				for(auto it = first; it != last; ++it)
 					outputter << hex << setfill('0') << setw(2) << int(*it) << " ";
-				outputter << "7e\n";
 				std::reverse(first,last);
 				outputter << "Sent bytes:\n";
 				for(auto it = first; it != last; ++it)
 					outputter << hex << setfill('0') << setw(2) << int(*it) << " ";
-				outputter << "7e\n";
 				myfile << outputter.str();
 				outputter.str("");
 				socket.sendMessage(&*first,std::distance(first,last));
