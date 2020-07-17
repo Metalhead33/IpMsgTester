@@ -1,0 +1,208 @@
+\documentclass[openany,10pt,a4paper]{book}
+\usepackage[a4paper, margin=1.5cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{t1enc}
+\usepackage[USenglish]{babel}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+}
+\lstset{basicstyle=\ttfamily,
+  showstringspaces=false,
+  commentstyle=\color{red},
+  keywordstyle=\color{blue}
+}
+\lstset{language=C++,
+                basicstyle=\ttfamily,
+                keywordstyle=\color{blue}\ttfamily,
+                stringstyle=\color{red}\ttfamily,
+                commentstyle=\color{green}\ttfamily,
+                morecomment=[l][\color{magenta}]{\#}
+}
+\title{Ip Message Tester}
+\author{Metalhead33}
+\date{July 17, 2020}
+\begin{document}
+\maketitle
+You are currently reading the documentation of \textbf{Ip Message Tester} by \textbf{Metalhead33}, a program written in the C++ language, designed to listen in on a certain port with a certain address, receive messages, log them and send them back in a modified form upon receipt, provided that they are in the proper format - which would be a string of bytes enclosed between two tilde characters, of 0x7E bytes.
+\tableofcontents
+\section{Running and Building}
+\subsection{Running}
+Running this software is fairly straightforward, as it involves running the program on the command line by invoking its name, and its various arguments. Upon invoking the program with no arguments, we receive a helper message:
+
+\begin{lstlisting}
+./IpMsgTester
+This program requires six command line arguments.
+Correct usage of this program is:
+-ip <IP address of the listener>
+-p <Port of the listener>
+-j <path to the journal file>
+These arguments can be given in any order, but all of them must be given.
+\end{lstlisting}
+
+As such, a correct invocation of the program would look more like this on Linux:
+
+\begin{lstlisting}[language=bash]
+./IpMsgTester -ip 127.0.0.1 -p 9000 -j logfile.txt
+\end{lstlisting}
+
+Alternatively, on Windows:
+
+\begin{lstlisting}[language=bash]
+IpMsgTester.exe -ip 127.0.0.1 -p 9000 -j logfile.txt
+\end{lstlisting}
+
+The arguments can be given in any random order, but care must be taken when making sure that they are in the proper format. While the program does offer some rudementary input-checking and reject IP addresses and ports given in the wrong format, giving an illegal filename results in undefined behaviour.
+
+\subsection{Building}
+Building this software is only recommended on the Linux system - while building it on Windows is certainly not impossible, it is not recommended, as the building process involves far more micromanagement under Windows, tracking down DLL dependencies, manually linking to CMake, et cetera. Either way, Ip Messageg Tester has a dependency on the \textbf{Boost} library, which is a free C++ library for various tasks, including networking, image manipulation, linear algebra and multithreading. Ip Messageg Tester relies on the \textbf{CMake} building system \textit{- on Linux, at least -} ensures an automatic linkage of the dependencies, and a clear error message on failure to do so.
+
+On Linux, the software can be built by doing the following steps:
+
+\begin{lstlisting}[language=bash]
+git clone https://github.com/Metalhead33/IpMsgTester.git
+cd IpMsgTester
+mkdir build
+cd build
+cmake ..
+make
+\end{lstlisting}
+
+The building process is somewhat more involved on Windows, and is thus left out of this documentation.
+\section{Software Documentation}
+\textbf{Ip Message Tester} was originally written with Linux in mind, with plans of porting to Windows as a later requirement - as such, I used the operating system's built-in functions for handling sockets and messages. This was my very first time engaging in such a subject, so I had to do some research on the proper functions to achieve the goal. In the end, I managed to cobble together something that fufilled the goals given in the letter by my employer, but the final solution wasn't platform-independent.
+
+At first, I attempted to port it to Windows by looking into WinSock, but quickly decided to start anew and rely on the \textbf{Boost} library for more a more platform-independent solution. This also had the added affect of making my code more \textbf{object-oriented}, as Boost is a C++ library, while both Linux's socket headers and Windows's WinSock are low-level C code that has to be explicitly wrapped for an object-oriented C++ experience.
+
+In order to test my program, I employed the \href{https://packetsender.com/}{\textbf{PacketSender}}, but per the recommendation of my future employer, I also tested it with the \textbf{Hercules Setup Utility} program.
+\subsection{Initialization}
+
+At the very heart of our program is the \textbf{main.cpp} file, which is where we begin the initialization of our whole mechanism:
+
+\begin{lstlisting}[language=C++,caption=main.cpp distilled]
+int main(int argc, char *argv[]) {
+  // Wrong number of arguments
+  if (argc < 7) {
+    ... // We print the helper message
+  } else {
+    char *identifiers[3] = {nullptr, nullptr, nullptr};
+    // We see which one of the command line arguments represents what.
+    CmdId caughtIdentifier = getIdentifierType(argv[1]);
+    if (caughtIdentifier != CmdId::NONE)
+      identifiers[caughtIdentifier] = argv[2];
+    caughtIdentifier = getIdentifierType(argv[3]);
+    if (caughtIdentifier != CmdId::NONE)
+      identifiers[caughtIdentifier] = argv[4];
+    caughtIdentifier = getIdentifierType(argv[5]);
+    if (caughtIdentifier != CmdId::NONE)
+      identifiers[caughtIdentifier] = argv[6];
+    // Now we validate.
+    if (!(identifiers[0] && identifiers[1] && identifiers[2])) {
+      ... // Return error message
+    }
+    if (getIdentifierType(identifiers[0]) != CmdId::NONE ||
+        getIdentifierType(identifiers[1]) != CmdId::NONE ||
+        getIdentifierType(identifiers[2]) != CmdId::NONE) {
+      ... // Return error message
+    }
+    // Okay, so all arguments were given, now it's time to check if they are in
+    // the proper format.
+    int portAddr;
+    if (!isIpAddress(identifiers[CmdId::LISTENER_IP])) {
+      ... // Return error message
+    }
+    if (!isPort(identifiers[CmdId::LISTENER_PORT], &portAddr)) {
+      ... // Return error message
+    }
+    // Okay, everything should be in order.
+    TCP::Server serv(io_context, identifiers[CmdId::JOURNAL_PATH],
+                     tcp::endpoint(tcp::v4(), portAddr));
+    serv.run();
+    io_context.run();
+  }
+  return 0;
+}
+\end{lstlisting}
+
+This code may not be the easiest to read, but its function is rather straightforward: we check if the program was started with the proper amount of arguments, and if it wasn't, we display the helper message and quit. If we did get the proper number of arguments, we validate each and every one of them, so that we can ensure that our program will run without any errors caused by user input.
+
+Once everything is set up, we run the two most important functions within the software.
+
+\begin{lstlisting}[language=C++]
+    serv.run();
+    io_context.run();
+\end{lstlisting}
+
+These two functions are what truly give Ip Message Tester its functionality, as they begin the process of receiving messages and replying to them.
+
+\subsection{Server and Client}
+
+Each and every operation on a computer involves a \textbf{server} and a \textbf{client}. Ip Message Tester is no different, and in the context of the assignment given to me by my future employer, Ip Message Tester acts as a server: it listens in on messages sent to a certain address, intercepts them and responds to them, \textit{"serving"} the clients the responses they are expecting to their messages.
+
+Ip Message Tester deals with servers and clients by creating a C++ class for each of them:
+
+\begin{lstlisting}[language=C++]
+class Client : boost::enable_shared_from_this<Client> {
+public:
+  friend class Server;
+  typedef boost::shared_ptr<Client> SharedPointer;
+  // typedef std::array<uint8_t,256> Arr;
+  typedef std::vector<uint8_t> Arr;
+  typedef Arr::iterator Iterator;
+
+private:
+  tcp::socket sock;
+  // std::vector<uint8_t> buff;
+  Arr buff;
+  std::stringstream outputter;
+  bool between;
+
+public:
+  Client(boost::asio::io_context &context);
+  Client(tcp::socket &&context);
+};
+\end{lstlisting}
+
+The \textbf{client} class contains its own internal buffer for the data it has sent to the server. This is where we record what was sent by the client to the server. For the sake of convenience, I also assigned a stringstream to each client, where it records the message that needs to be logged into the logfile. Naturally, each client has its own socket, through which we communicate with it. It also has a boolean variable for deciding whether the message we have received is enclosed between two tildes or 0x7E bytes.
+
+\begin{lstlisting}[language=C++]
+class Server : boost::enable_shared_from_this<Server> {
+public:
+  typedef boost::shared_ptr<Server> SharedPointer;
+  typedef std::list<Client> ClientList;
+  typedef ClientList::iterator ClientIterator;
+
+private:
+  boost::asio::io_context &context;
+  std::ofstream myfile;
+  tcp::acceptor acceptor;
+  ClientList clients;
+
+public:
+  Server(boost::asio::io_context &iocontenxt, std::ofstream &&nfile,
+         const tcp::endpoint &ep);
+  Server(boost::asio::io_context &iocontenxt, const char *nfile,
+         const boost::asio::ip::tcp::endpoint &ep);
+  void beginAccepting();
+  void handleAcceptedClient(tcp::socket &&client,
+                            const boost::system::error_code &error);
+  void beginReading(ClientIterator it);
+  void onReadBuffer(ClientIterator it, const boost::system::error_code &ec,
+                    size_t len);
+  void run();
+};
+\end{lstlisting}
+
+The \textbf{server} class primarily contains a socket - the so-called \textit{"acceptor"} - which is bound to the IP address and port given by the user, listening in on anyone else attempting to establish a connection to that specific address and port. As its name suggests, the \textit{"acceptor"} accepts these connections, from which new, temporary sockets are born - these are assigned to the clients, as the acceptor is essentially accepting clients requesting a connection to the server.
+
+In addition to the acceptor, the server also contains the list of clients it has accepted, as well as a pointer to a file stream, which allows the server to log to a file, as it was demanded by my future employer. The various functional methods that the server class has - \textbf{beginAccepting}, \textbf{handleAcceptedClient} and \textbf{beginReading}, \textbf{onReadBuffer} - are functions supplied to Boost's callback methods. \textbf{beginAccepting} begins accepting connection requests from clients invoking \textbf{handleAcceptedClient}, which begins communication with an individual client, invoking \textbf{beginReading}, which reads from the input given by the client. After that, \textbf{onReadBuffer} is invoked, which checks if the message is in the correct format, sends it back to the client in reversed form if it is, and logs to the logfile.
+
+\subsection{All coming together}
+
+During the execution of Ip Message Tester, as stated in the documentation previously, the program checks for the user's command-line arguments, validating them, and in case of them being valid, creates a TCP/IP server that listens in on the given port and address, accepting connection requests from clients sending messages to that specific port and address. Upon receipt of a message in the correct format, a modified - reversed - version is sent back to the client, and both the input and output are logged in the log file, as demanded by my future employer.
+\end{document}

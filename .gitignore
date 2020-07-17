@@ -1,0 +1,9 @@
+*.pdf
+*.pdf_tex
+*.aux
+*.toc
+*.out
+*.log
+*.d
+*.part
+index.tex
