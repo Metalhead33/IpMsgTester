@@ -7,9 +7,206 @@
 \usepackage{t1enc}
 \def\magyarOptions{defaults=hu-min}
 \usepackage[magyar]{babel}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+}
+\lstset{basicstyle=\ttfamily,
+  showstringspaces=false,
+  commentstyle=\color{red},
+  keywordstyle=\color{blue}
+}
+\lstset{language=C++,
+                basicstyle=\ttfamily,
+                keywordstyle=\color{blue}\ttfamily,
+                stringstyle=\color{red}\ttfamily,
+                commentstyle=\color{green}\ttfamily,
+                morecomment=[l][\color{magenta}]{\#}
+}
 \title{Ip Messageg Tester}
 \author{Metalhead33}
 \date{2020 Július 17}
 \begin{document}
 \maketitle
+Ön jelenleg az \textbf{Ip Message Tester} nevezetű program dokumentációját olvassa, melyet \textbf{Metalhead33} fejlesztett a C++ nyelven. A programot arra tervezték, hogy halgassa a bejövő csatlakozási kérelmeket és üzeneteket egy adott IP címen és porton, loggolja őket, majd megfelelő input esetén megfordítva visszaküldi a küldőnek - a megfelelő formátum pedig az, ha egy 0x7E bájttal kezdődik és végződik az input.
+\tableofcontents
+\section{Futtatás és építés}
+\subsection{Futtatás}
+A szoftver futtatása nagyon egyszerű - mivel egy parancssoros alkalmazásról van szó, a konzolba be kell ütni az alkalmazás nevét, majd a paramétereket. Amennyiben paraméterek nélkül próbáljuk meg elindíteni a programot, a következő üzenetet kapjuk:
+
+\begin{lstlisting}
+./IpMsgTester
+This program requires six command line arguments.
+Correct usage of this program is:
+-ip <IP address of the listener>
+-p <Port of the listener>
+-j <path to the journal file>
+These arguments can be given in any order, but all of them must be given.
+\end{lstlisting}
+
+Ami magyarul azt jelenti, hogy a programnak hat paraméterre van szüksége, amiből három igazából a tényleges paraméterek prefixuma: \textit{-ip} \textbf{<az IP cím>} \textit{-p} \textbf{<a port IP cím>} \textit{-j} \textbf{<a logfájl útvonala>}.
+
+Példa egy korrekt paraméterezésre a Linux alatt:
+
+\begin{lstlisting}[language=bash]
+./IpMsgTester -ip 127.0.0.1 -p 9000 -j logfile.txt
+\end{lstlisting}
+
+És a Windows alatt:
+
+\begin{lstlisting}[language=bash]
+IpMsgTester.exe -ip 127.0.0.1 -p 9000 -j logfile.txt
+\end{lstlisting}
+
+A paramétereket tetszőleges sorrendben meg lehet adni, viszont ügyelni kell rá, hogy megfelelő formátumban legyenek - bár a program végez kezdetleges inputellenőrzést \textit{(pl. az IP cím esetében hogy pontok után csak számok jöhetnek, vagy hogy a portnak egy számnak kell lennie 0 és 65535 között)} és hibaüzenettel kilép rossz input esetén, a rossz fájlnév megadása előre ki nem számítható viselkedést eredményez.
+
+\subsection{Építés}
+A program építését csak a Linux rendszer alatt tudom ajánlani - bár Windows alatt építeni nem lehetetlen, mégsem ajánlom, hiszen egy jóval bonyolultabb folyamat mint Linux alatt, és több manuális mikromenedzsmentet igényel. Mindenesetre, az Ip Message Tester-nek két függősége van: a Boost szoftverkönyvtár valamint a CMake, amivel építeni lehet. A Boost szoftverkönyvtár egy ingyenes és nyílt forráskódú C++ könyvtár, rutinok gyűjteménye mely sokkal könnyebbé teszi a programozó életét, főleg ha hálózattal, képmanipulációval, lineáris algebrával vagy párhuzamos programozással foglalkozik. A CMake egy szoftverépítési rendszer, mely lehetővé teszi \textit{- legalábbis a Linux alatt -} hogy a szoftver függőségei autómatikusan hivatkozásra kerüljenek, általában felhasználói beavatkozás szükségessége nélkül.
+
+A Linux alatt a szoftver felépítése ezen lépésekből áll:
+
+\begin{lstlisting}[language=bash]
+git clone https://github.com/Metalhead33/IpMsgTester.git
+cd IpMsgTester
+mkdir build
+cd build
+cmake ..
+make
+\end{lstlisting}
+
+Az építési folyamat jóval bonyolultabb a Windows alatt, ezért kihagytam a dokumentációból.
+\section{Szoftver Dokumentáció}
+Az \textbf{Ip Message Tester} eredetileg a Linuxra volt írva, és a Windows-ra való portolás csak egy későbbi elvárás volt - azaz a szoftver eredetileg a UNIX beépített socket-es függvényeit felhasználva írtam, és végül sikerült a munkáltatói követelményeknek teljesen megfelelő programot írnom, viszont nem volt platformfüggetlen. Ez volt az első alkalom hogy ezen témával foglalkoztam, így egy-két órát el kellett töltenem kutatással. 
+
+Elősször nekiláttam a Windows-ra való portálásnak úgy, hogy a WinSock-ot használjam fel, de végül úgy döntöttem hogy inkább újraírom a programot a Boost-ra, ami nem csak hogy platformfüggetlenséget adott, hanem a kódot objektumorientáltabbá tette \textit{(tekintve hogy a Boost egy C++ könyvtár, mig a UNIX és WinSock függvények C-s függvények melyekhez wrapper-t kell írni)}, valamint növelte a program párhuzamosíthatóságát is.
+
+A programot a \href{https://packetsender.com/}{\textbf{PacketSender}} segítségével teszteltem, viszont felhasználtam a \textbf{Hercules Setup Utility} nevű programot is a jövendőbeli munkáltatóm ajánlására.
+
+\subsection{Inicializálás}
+
+A program szíve a \textbf{main.cpp}, ahol megkezdjük a teljes mechanizmus inicializálását:
+
+\begin{lstlisting}[language=C++,caption=main.cpp distilled]
+int main(int argc, char *argv[]) {
+  // Wrong number of arguments
+  if (argc < 7) {
+    ... // Kiírjuk a segítőszöveget
+  } else {
+    char *identifiers[3] = {nullptr, nullptr, nullptr};
+    // Megnézzük hogy melyik paraméter mit jelez
+    CmdId caughtIdentifier = getIdentifierType(argv[1]);
+    if (caughtIdentifier != CmdId::NONE)
+      identifiers[caughtIdentifier] = argv[2];
+    caughtIdentifier = getIdentifierType(argv[3]);
+    if (caughtIdentifier != CmdId::NONE)
+      identifiers[caughtIdentifier] = argv[4];
+    caughtIdentifier = getIdentifierType(argv[5]);
+    if (caughtIdentifier != CmdId::NONE)
+      identifiers[caughtIdentifier] = argv[6];
+    // Most validálunk
+    if (!(identifiers[0] && identifiers[1] && identifiers[2])) {
+      ... // Hibaüzenet küldése
+    }
+    if (getIdentifierType(identifiers[0]) != CmdId::NONE ||
+        getIdentifierType(identifiers[1]) != CmdId::NONE ||
+        getIdentifierType(identifiers[2]) != CmdId::NONE) {
+      ... // Hibaüzenet küldése
+    }
+    // Jó, most már tudjuk hogy minden paraméter
+    // meg lett adva. Megnézzük hogy jó formátumban-e
+    int portAddr;
+    if (!isIpAddress(identifiers[CmdId::LISTENER_IP])) {
+      ... // Hibaüzenet küldése
+    }
+    if (!isPort(identifiers[CmdId::LISTENER_PORT], &portAddr)) {
+      ... // Hibaüzenet küldése
+    }
+    // Jó, elvileg minden rendben
+    TCP::Server serv(io_context, identifiers[CmdId::JOURNAL_PATH],
+                     tcp::endpoint(tcp::v4(), portAddr));
+    serv.run();
+    io_context.run();
+  }
+  return 0;
+}
+\end{lstlisting}
+
+Eme kódot a nem a legegyszerűbb elolvasni, viszont funkciója nagyon is egyszerűen elmagyarázható: leellenőrizzük, hogy a felhasználó megfelelő mennyiségű paramétert adott-e meg, és amennyiben nem, hibaüzenetet ír ki a program, majd kilép. Amennyiben megfelelő a paraméterek mennyisége, validáljuk az összeset, hogy lehetővé tegyük azt, hogy a program zökkenőmentesen fusson - vagy legalábbis felhasználói input által okozott hibáktól mentesen.
+
+Amint elintéztük, hogy minden rendben van, a két legfontosabb függvényt invokáljuk:
+
+\begin{lstlisting}[language=C++]
+    serv.run();
+    io_context.run();
+\end{lstlisting}
+
+Ez a két függvény az, mely ténylegesen megadja a programnak a funkcionalitását, hiszen ezen két függvény meghívása után kezdi el a program pásztázni az étert üzenetekért, hogy válaszolhasson rájuk.
+
+\subsection{Szerverek és Kliensek}
+
+A legtöbb számítógépes program esetében feláll valamiféle \textbf{kiszolgáló}-\textbf{ügyfél}, vagy angolosabban és latinosabban \textbf{szerver}-\textbf{kliens} kapcsolat. A kliens elvár valamiféle szolgálatot, amit a szerver szervál, azaz kiszolgál. A Ip Message Tester is egy ilyen program, és a szerver szerepét tölti be: egy bizonyos IP címre és portra ráteszi fülét a program, hallgatva hogy jönnek-e üzenetek és csatlakozási kérelmek. Amennyiben jönnek, feltartóztatja őket, elfogadja a csatlakozási kérelmeket, és kiszolgálja ezen klienseket, méghozzá az üzeneteikre várt válaszokkal.
+
+Ip Message Tester ezt úgy bonyolítja le, hogy C++ osztály reprezentálja a klienst és szervert egyaránt:
+
+\begin{lstlisting}[language=C++]
+class Client : boost::enable_shared_from_this<Client> {
+public:
+  friend class Server;
+  typedef boost::shared_ptr<Client> SharedPointer;
+  typedef std::vector<uint8_t> Arr;
+  typedef Arr::iterator Iterator;
+
+private:
+  tcp::socket sock;
+  Arr buff;
+  std::stringstream outputter;
+  bool between;
+
+public:
+  Client(boost::asio::io_context &context);
+  Client(tcp::socket &&context);
+};
+\end{lstlisting}
+
+A \textbf{Client} osztály tartalmazza a saját felső pufferét, amely igazából azokat a bájtokat tartalmazza, melyeket a szerver kap a kliensektől. Az egyszerűség kedvéért a kliensekhez sztringfolyamok is vannak rendelve, melyek igazából a logfájlba irandó szöveget tartalmazzák átmenetileg. Természetesen minden kliensnek van saját sockete, amelyen keresztűl a szerver képes velük kommunikálni. Végül de nem utolsó sorban, a klienseknél van egy boolean érték is, mely eldönteni hogy a jelenleg kapott bájtok két 0x7E közt vannak-e bezárva, vagy sem.
+
+\begin{lstlisting}[language=C++]
+class Server : boost::enable_shared_from_this<Server> {
+public:
+  typedef boost::shared_ptr<Server> SharedPointer;
+  typedef std::list<Client> ClientList;
+  typedef ClientList::iterator ClientIterator;
+
+private:
+  boost::asio::io_context &context;
+  std::ofstream myfile;
+  tcp::acceptor acceptor;
+  ClientList clients;
+
+public:
+  Server(boost::asio::io_context &iocontenxt, std::ofstream &&nfile,
+         const tcp::endpoint &ep);
+  Server(boost::asio::io_context &iocontenxt, const char *nfile,
+         const boost::asio::ip::tcp::endpoint &ep);
+  void beginAccepting();
+  void handleAcceptedClient(tcp::socket &&client,
+                            const boost::system::error_code &error);
+  void beginReading(ClientIterator it);
+  void onReadBuffer(ClientIterator it, const boost::system::error_code &ec,
+                    size_t len);
+  void run();
+};
+\end{lstlisting}
+
+A \textbf{Server} osztály tartalmazza az elsődleges socketet, melyet \textit{"acceptor"}-nak, azaz magyarosan \textit{"elfogadó"}-nak hívunk - ezt rendeljük hozzá a felhasználó átal megadott IP címhez és porthoz. Mint ahogy a neve is mondja, acceptálva, elfogadva az adott címre és portra érkező csatlakozási kérvényeket, melyekre új socketek létrehozásával válaszol - a szóbanforgó új socketeket a kliensekhez rendeljük, hisz végülis hozzájuk tartoznak.
+
+Az acceptor mellett a szerver tartalmazza az elfogadott kliensek listáját is, valamint egy mutatót egy fájlfolyamhoz, mellyel írunk a logfájlba, mint ahogy a jövendőbeli munkáltatóm kérte. A különböző metódusok - \textbf{beginAccepting}, \textbf{handleAcceptedClient}, \textbf{beginReading} és \textbf{onReadBuffer} - igazából a Boost számára biztosított callback-ok. A \textbf{beginAccepting} függvény megkezdi a csatlakozási kérelmek elfogadását, és minden elfogadott csatlakozási kérelemhez meghívja a \textbf{handleAcceptedClient} függvényt, mely megkezdi az adott klienssel a kommunikációt, meghívva a \textbf{beginReading} függvényt, mely beolvassa a kliensről érkező inputot. Ezután az \textbf{onReadBuffer} függvény feldolgozza a beolvasott inputot, megnézi hogy megfelelő formátumban lett-e írva, majd visszaküldi a kliensnek visszafordított formátumban, s végül de nem utolsó sorban mindezt rögzíti a logfájlba.
+
+\subsection{Minden együtt}
+
+A program futtatásakor, mint ahogy a dokumentációban már előbb megírtam, a program leellenőrzi a felhasználó által megadott paramétereket, validálja őket, és amennyiben megfelelőek, létrehoz egy TCP/IP szervert, mely az adott cımen elkezd hallgatózni, elfogadva a kliensek csatlakozási kérelmeit, és amennyiben megfelelő formátumú üzenetet küldtek, válaszolva üzeneteikre, visszafordított formában, valamint mindezt logolva a logfájlba.
 \end{document}
+
